@@ -6,6 +6,9 @@ var mode_label: Label
 var prompt_label: Label
 var trick_label: Label
 var score_label: Label
+var money_label: Label
+var rep_label: Label
+var health_bar: ProgressBar
 var pause_layer: Control
 var total_score := 0
 var trick_tween: Tween
@@ -58,6 +61,22 @@ func set_pause_visible(visible: bool) -> void:
 		pause_layer.visible = visible
 
 
+func set_money(balance: int, _delta := 0) -> void:
+	if money_label:
+		money_label.text = "CASH   $%d" % balance
+
+
+func set_reputation(rep: int, level_name: String, _fraction: float) -> void:
+	if rep_label:
+		rep_label.text = "REP    %s / %d" % [level_name.to_upper(), rep]
+
+
+func set_health(health: int, maximum: int) -> void:
+	if health_bar:
+		health_bar.max_value = maximum
+		health_bar.value = health
+
+
 func _build_hud() -> void:
 	var root := Control.new()
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -84,10 +103,24 @@ func _build_hud() -> void:
 	var stats := _panel(Vector2(-258, 24), Vector2(230, 102), Color(0.03, 0.025, 0.035, 0.90), ORANGE)
 	stats.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	root.add_child(stats)
-	stats.add_child(_label("CASH   $128", Vector2(15, 12), 19, Color("#77ec8b")))
-	stats.add_child(_label("REP    ★★☆☆☆", Vector2(15, 42), 16, ACID))
+	money_label = _label("CASH   $0", Vector2(15, 12), 19, Color("#77ec8b"))
+	stats.add_child(money_label)
+	rep_label = _label("REP    NOBODY / 0", Vector2(15, 42), 16, ACID)
+	stats.add_child(rep_label)
 	score_label = _label("000000", Vector2(15, 69), 17, PAPER)
 	stats.add_child(score_label)
+
+	var health_panel := _panel(Vector2(24, 232), Vector2(210, 51), Color(0.03, 0.025, 0.035, 0.90), ORANGE)
+	root.add_child(health_panel)
+	health_bar = ProgressBar.new()
+	health_bar.position = Vector2(12, 15)
+	health_bar.size = Vector2(186, 21)
+	health_bar.max_value = 100
+	health_bar.value = 100
+	health_bar.show_percentage = false
+	health_bar.add_theme_stylebox_override("background", _style(INK, PAPER, 1, 1))
+	health_bar.add_theme_stylebox_override("fill", _style(ORANGE, ORANGE, 0, 0))
+	health_panel.add_child(health_bar)
 
 	var motion := _panel(Vector2(24, -145), Vector2(295, 116), Color(0.03, 0.025, 0.035, 0.90), ACID)
 	motion.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)

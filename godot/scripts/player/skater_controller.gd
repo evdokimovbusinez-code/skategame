@@ -1,21 +1,24 @@
 class_name SkaterController
 extends CharacterBody3D
 
+const Config = preload("res://scripts/config/game_config.gd")
+const PunkRigScript = preload("res://scripts/player/punk_rig.gd")
+
 signal speed_changed(value: float)
 signal mode_changed(value: String)
 signal trick_called(name: String, score: int)
 signal prompt_changed(text: String)
 
-const GRAVITY := 21.58
-const SKATE_MAX_SPEED := 12.5
-const PUSH_ACCELERATION := 15.0
-const ROLL_ACCELERATION := 3.4
-const BRAKE_DECELERATION := 14.0
-const ROLL_DRAG := 0.42
-const WALK_SPEED := 4.2
-const RUN_SPEED := 6.8
-const OLLIE_VELOCITY := 7.2
-const GRIND_MIN_SPEED := 3.0
+const GRAVITY := Config.GRAVITY
+const SKATE_MAX_SPEED := Config.SKATE_MAX_SPEED
+const PUSH_ACCELERATION := Config.SKATE_PUSH_ACCELERATION
+const ROLL_ACCELERATION := Config.SKATE_ROLL_ACCELERATION
+const BRAKE_DECELERATION := Config.SKATE_BRAKE_DECELERATION
+const ROLL_DRAG := Config.SKATE_GROUND_FRICTION
+const WALK_SPEED := Config.WALK_MAX_SPEED
+const RUN_SPEED := Config.WALK_MAX_SPEED * Config.WALK_SPRINT_MULTIPLIER
+const OLLIE_VELOCITY := Config.OLLIE_IMPULSE
+const GRIND_MIN_SPEED := Config.GRIND_MIN_ENTRY_SPEED
 
 var skate_mode := true
 var skate_speed := 0.0
@@ -31,9 +34,10 @@ var trick_kind := ""
 var air_time := 0.0
 var combo_score := 0
 
-var visual_root := Node3D.new()
-var body_root := Node3D.new()
-var board_root := Node3D.new()
+var visual_root: Node3D
+var body_root: Node3D
+var board_root: Node3D
+var punk_rig: PunkRig
 var camera_pivot := Node3D.new()
 var camera := Camera3D.new()
 var mode_transition := 1.0
@@ -60,12 +64,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _physics_process(delta: float) -> void:
 	if Input.is_action_just_pressed("reset_player"):
-		global_position = Vector3(4.0, 1.2, 10.5)
+		global_position = Config.PLAYER_SPAWN
 		velocity = Vector3.ZERO
 		skate_speed = 0.0
 		_end_grind()
 
-	if Input.is_action_just_pressed("toggle_mode") and absf(skate_speed) < 2.0:
+	if Input.is_action_just_pressed("toggle_mode") and absf(skate_speed) < Config.MODE_TOGGLE_MAX_SPEED:
 		skate_mode = not skate_mode
 		mode_transition = 0.0
 		mode_changed.emit("SKATE" if skate_mode else "WALK")
@@ -91,12 +95,12 @@ func _update_skating(delta: float) -> void:
 	steering = move_toward(steering, steer_input, delta * 6.0)
 
 	var speed_fraction := clampf(absf(skate_speed) / SKATE_MAX_SPEED, 0.0, 1.0)
-	var turn_rate := lerpf(2.35, 1.18, speed_fraction)
+	var turn_rate := deg_to_rad(lerpf(Config.SKATE_LOW_SPEED_TURN_RATE, Config.SKATE_MAX_SPEED_TURN_RATE, speed_fraction))
 	yaw -= steering * turn_rate * delta
 
 	if grounded:
 		if Input.is_action_just_pressed("move_forward"):
-			skate_speed = minf(SKATE_MAX_SPEED, skate_speed + 4.8)
+			skate_speed = minf(SKATE_MAX_SPEED, skate_speed + PUSH_ACCELERATION * Config.SKATE_PUSH_BURST_FRACTION)
 		elif Input.is_action_pressed("move_forward"):
 			skate_speed = move_toward(skate_speed, SKATE_MAX_SPEED, ROLL_ACCELERATION * delta)
 		else:
@@ -105,12 +109,12 @@ func _update_skating(delta: float) -> void:
 			skate_speed = move_toward(skate_speed, 0.0, BRAKE_DECELERATION * delta)
 		if Input.is_action_just_pressed("ollie"):
 			velocity.y = OLLIE_VELOCITY
-			_start_trick("OLLIE", 45, 0.42)
+			_start_trick("OLLIE", Config.SCORE.ollie, 0.42)
 	else:
 		velocity.y -= GRAVITY * delta
 		air_time += delta
 		if Input.is_action_just_pressed("trick"):
-			_start_trick("KICKFLIP", 150, 0.56)
+			_start_trick("KICKFLIP", Config.SCORE.kickflip, Config.KICKFLIP_DURATION)
 
 	var forward := -transform.basis.z
 	velocity.x = forward.x * skate_speed
@@ -119,8 +123,8 @@ func _update_skating(delta: float) -> void:
 
 	if is_on_floor() and not grounded:
 		if air_time > 0.18:
-			trick_called.emit("CLEAN LANDING", 25)
-			combo_score += 25
+			trick_called.emit("CLEAN LANDING", Config.SCORE.clean_landing)
+			combo_score += Config.SCORE.clean_landing
 		air_time = 0.0
 
 
@@ -132,16 +136,16 @@ func _update_walking(delta: float) -> void:
 	var target_speed := RUN_SPEED if Input.is_action_pressed("sprint") else WALK_SPEED
 
 	if direction.length_squared() > 0.01:
-		velocity.x = move_toward(velocity.x, direction.x * target_speed, delta * 18.0)
-		velocity.z = move_toward(velocity.z, direction.z * target_speed, delta * 18.0)
+		velocity.x = move_toward(velocity.x, direction.x * target_speed, delta * Config.WALK_ACCELERATION)
+		velocity.z = move_toward(velocity.z, direction.z * target_speed, delta * Config.WALK_ACCELERATION)
 	else:
-		velocity.x = move_toward(velocity.x, 0.0, delta * 20.0)
-		velocity.z = move_toward(velocity.z, 0.0, delta * 20.0)
+		velocity.x = move_toward(velocity.x, 0.0, delta * Config.WALK_DECELERATION)
+		velocity.z = move_toward(velocity.z, 0.0, delta * Config.WALK_DECELERATION)
 
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
 	elif Input.is_action_just_pressed("ollie"):
-		velocity.y = 8.0
+		velocity.y = Config.WALK_JUMP_IMPULSE
 
 	move_and_slide()
 	skate_speed = Vector2(velocity.x, velocity.z).length()
@@ -151,7 +155,7 @@ func _try_begin_grind() -> void:
 	if is_on_floor() or absf(skate_speed) < GRIND_MIN_SPEED:
 		return
 	var nearest: GrindRail
-	var best_distance := 0.78
+	var best_distance := Config.GRIND_SNAP_DISTANCE
 	for candidate in get_tree().get_nodes_in_group("grind_rails"):
 		if candidate is GrindRail:
 			var distance := candidate.distance_to_rail(global_position)
@@ -182,7 +186,7 @@ func _update_grind(delta: float) -> void:
 
 	if Input.is_action_just_pressed("ollie"):
 		_end_grind()
-		velocity = rail_direction * maxf(skate_speed, 5.5) + Vector3.UP * 6.4
+		velocity = rail_direction * (maxf(skate_speed, 5.5) + Config.GRIND_EXIT_BOOST) + Vector3.UP * 6.4
 	elif grind_t <= 0.0 or grind_t >= 1.0:
 		_end_grind()
 		velocity = rail_direction * maxf(skate_speed, 4.5)
@@ -225,8 +229,10 @@ func _update_visuals(delta: float) -> void:
 	var speed_fraction := clampf(absf(skate_speed) / SKATE_MAX_SPEED, 0.0, 1.0)
 	var lean := -steering * speed_fraction * 0.28
 	body_root.rotation.z = lerpf(body_root.rotation.z, lean, delta * 8.0)
-	body_root.position.y = sin(Time.get_ticks_msec() * 0.0022) * 0.012
+	var animation_time := Time.get_ticks_msec() * 0.001
+	body_root.position.y = PunkRigScript.HIP_HEIGHT + sin(animation_time * 2.2) * 0.012
 	camera_pivot.rotation.x = camera_pitch
+	_update_bone_animation(animation_time, speed_fraction, delta)
 
 	if trick_time < trick_duration:
 		trick_time += delta
@@ -247,11 +253,35 @@ func _update_visuals(delta: float) -> void:
 		board_root.rotation.y = lerpf(board_root.rotation.y, PI * 0.5, mode_transition)
 
 
+func _update_bone_animation(time: float, speed_fraction: float, delta: float) -> void:
+	if not punk_rig:
+		return
+	var blend := clampf(delta * 10.0, 0.0, 1.0)
+	if skate_mode:
+		var push_phase := sin(time * (4.0 + speed_fraction * 5.0))
+		punk_rig.spine.rotation.x = lerpf(punk_rig.spine.rotation.x, -0.12 - speed_fraction * 0.08, blend)
+		punk_rig.left_upper_leg.rotation.x = lerpf(punk_rig.left_upper_leg.rotation.x, 0.2, blend)
+		punk_rig.right_upper_leg.rotation.x = lerpf(punk_rig.right_upper_leg.rotation.x, -0.14 + push_phase * 0.11, blend)
+		punk_rig.left_lower_leg.rotation.x = lerpf(punk_rig.left_lower_leg.rotation.x, -0.28, blend)
+		punk_rig.right_lower_leg.rotation.x = lerpf(punk_rig.right_lower_leg.rotation.x, 0.18 + maxf(push_phase, 0.0) * 0.35, blend)
+		punk_rig.left_upper_arm.rotation.x = lerpf(punk_rig.left_upper_arm.rotation.x, -0.12 + push_phase * 0.12, blend)
+		punk_rig.right_upper_arm.rotation.x = lerpf(punk_rig.right_upper_arm.rotation.x, 0.12 - push_phase * 0.12, blend)
+	else:
+		var stride := sin(time * (5.4 if speed_fraction < 0.8 else 8.0)) * minf(speed_fraction * 1.5, 1.0)
+		punk_rig.spine.rotation.x = lerpf(punk_rig.spine.rotation.x, -0.03, blend)
+		punk_rig.left_upper_leg.rotation.x = lerpf(punk_rig.left_upper_leg.rotation.x, stride * 0.65, blend)
+		punk_rig.right_upper_leg.rotation.x = lerpf(punk_rig.right_upper_leg.rotation.x, -stride * 0.65, blend)
+		punk_rig.left_lower_leg.rotation.x = lerpf(punk_rig.left_lower_leg.rotation.x, maxf(-stride, 0.0) * 0.62, blend)
+		punk_rig.right_lower_leg.rotation.x = lerpf(punk_rig.right_lower_leg.rotation.x, maxf(stride, 0.0) * 0.62, blend)
+		punk_rig.left_upper_arm.rotation.x = lerpf(punk_rig.left_upper_arm.rotation.x, -stride * 0.52, blend)
+		punk_rig.right_upper_arm.rotation.x = lerpf(punk_rig.right_upper_arm.rotation.x, stride * 0.52, blend)
+
+
 func _build_collision() -> void:
 	var collision := CollisionShape3D.new()
 	var capsule := CapsuleShape3D.new()
-	capsule.radius = 0.32
-	capsule.height = 1.34
+	capsule.radius = Config.CAPSULE_RADIUS
+	capsule.height = Config.CAPSULE_HALF_HEIGHT * 2.0 + Config.CAPSULE_RADIUS * 2.0
 	collision.shape = capsule
 	collision.position.y = 0.67
 	add_child(collision)
@@ -269,32 +299,13 @@ func _build_camera() -> void:
 
 
 func _build_character() -> void:
-	visual_root.name = "Visual"
-	add_child(visual_root)
-	body_root.name = "Body"
-	visual_root.add_child(body_root)
-	_add_box(body_root, Vector3(0.48, 0.53, 0.28), Vector3(0, 1.12, 0), Color("#171519"))
-	_add_box(body_root, Vector3(0.38, 0.34, 0.32), Vector3(0, 1.57, 0), Color("#d19a69"))
-	_add_box(body_root, Vector3(0.52, 0.42, 0.05), Vector3(0, 1.1, -0.17), Color("#111112"))
-	_add_box(body_root, Vector3(0.38, 0.23, 0.04), Vector3(0, 1.1, -0.205), Color("#d8d0c5"))
-	for side in [-1.0, 1.0]:
-		_add_box(body_root, Vector3(0.15, 0.58, 0.17), Vector3(side * 0.31, 1.03, 0), Color("#d19a69"))
-		_add_box(body_root, Vector3(0.18, 0.7, 0.22), Vector3(side * 0.14, 0.48, 0), Color("#17191f"))
-		_add_box(body_root, Vector3(0.25, 0.12, 0.43), Vector3(side * 0.14, 0.09, -0.08), Color("#eee5d6"))
-		_add_box(body_root, Vector3(0.07, 0.05, 0.03), Vector3(side * 0.07, 1.6, -0.175), Color("#151515"))
-	for index in range(7):
-		var spike := MeshInstance3D.new()
-		var cone := CylinderMesh.new()
-		cone.top_radius = 0.0
-		cone.bottom_radius = 0.065
-		cone.height = 0.24 + sin(index / 6.0 * PI) * 0.12
-		cone.radial_segments = 5
-		cone.material = _material(Color("#a42c7a"), 0.8, 0.0)
-		spike.mesh = cone
-		spike.position = Vector3(0, 1.83 + cone.height * 0.5, -0.18 + index * 0.06)
-		spike.rotation.z = (index - 3) * 0.06
-		body_root.add_child(spike)
-	_build_board()
+	punk_rig = PunkRigScript.new()
+	punk_rig.name = "Visual"
+	punk_rig.build()
+	add_child(punk_rig)
+	visual_root = punk_rig
+	body_root = punk_rig.hips
+	board_root = punk_rig.board
 
 
 func _build_board() -> void:

@@ -21,6 +21,7 @@ func _ready() -> void:
 
 func _build_environment() -> void:
 	var world_environment := WorldEnvironment.new()
+	world_environment.name = "WorldEnvironment"
 	var environment := Environment.new()
 	environment.background_mode = Environment.BG_COLOR
 	environment.background_color = Color("#8e5b6b")
@@ -177,6 +178,7 @@ func _build_burnout_shop() -> void:
 		light.light_color = Color("#ffc58a")
 		light.light_energy = 4.2
 		light.omni_range = 11.0
+		light.add_to_group("night_lights")
 		add_child(light)
 
 
@@ -352,6 +354,7 @@ func _add_lamp(at: Vector3) -> void:
 	light.light_color = Color("#ffd08a")
 	light.light_energy = 2.8
 	light.omni_range = 8.5
+	light.add_to_group("night_lights")
 	add_child(light)
 
 
