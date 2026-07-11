@@ -6,6 +6,8 @@ const HUDScript = preload("res://scripts/ui/skate_hud.gd")
 const Config = preload("res://scripts/config/game_config.gd")
 const DayNightScript = preload("res://scripts/rendering/day_night_cycle.gd")
 const GameStateScript = preload("res://scripts/systems/game_state.gd")
+const ExactWorldLoaderScript = preload("res://scripts/world/exact_world_loader.gd")
+const ExactCollisionScript = preload("res://scripts/world/exact_collision_world.gd")
 
 var player: CharacterBody3D
 var hud: CanvasLayer
@@ -15,6 +17,12 @@ var game_state: GameState
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_register_input_map()
+	var exact_world := ExactWorldLoaderScript.new()
+	exact_world.name = "ExactWebWorld"
+	add_child(exact_world)
+	var exact_collisions := ExactCollisionScript.new()
+	exact_collisions.name = "ExactWebCollisions"
+	add_child(exact_collisions)
 
 	var district := DistrictScript.new()
 	district.name = "BurnoutDistrict"

@@ -5,6 +5,8 @@ const RailScript = preload("res://scripts/world/grind_rail.gd")
 const NPCScript = preload("res://scripts/actors/skate_npc.gd")
 
 var materials: Dictionary = {}
+var collision_only := true
+var collisions_enabled := false
 
 
 func _ready() -> void:
@@ -16,7 +18,16 @@ func _ready() -> void:
 	_build_abandoned_building()
 	_build_loading_and_parking()
 	_build_street_life()
+	if collision_only:
+		_hide_generated_visuals(self)
 	_spawn_characters()
+
+
+func _hide_generated_visuals(root: Node) -> void:
+	for child in root.get_children():
+		if child is MeshInstance3D or child is Label3D:
+			child.visible = false
+		_hide_generated_visuals(child)
 
 
 func _build_environment() -> void:
@@ -105,14 +116,14 @@ func _build_skatepark() -> void:
 		)
 	_add_box("LeftHubba", Vector3(-1.75, 0.48, 6.15), Vector3(0.65, 0.96, 3.9), Color("#85817a"))
 	_add_box("RightHubba", Vector3(3.35, 0.48, 6.15), Vector3(0.65, 0.96, 3.9), Color("#85817a"))
-	_add_rail(Vector3(-0.05, 0.82, 4.2), Vector3(-0.05, 0.22, 7.25))
-	_add_rail(Vector3(1.65, 0.82, 4.2), Vector3(1.65, 0.22, 7.25))
+	_add_rail(Vector3(-0.05, 0.78, 4.2), Vector3(-0.05, 0.2, 7.25))
+	_add_rail(Vector3(1.65, 0.78, 4.2), Vector3(1.65, 0.2, 7.25))
 
 	_add_box("ManualPad", Vector3(2.1, 0.29, 12.2), Vector3(5.8, 0.58, 3.6), Color("#85817a"))
 	_add_slope("ManualPadWest", Vector3(-1.65, 0.27, 12.2), Vector3(2.2, 0.22, 1.9), -14, 90, Color("#85817a"))
 	_add_slope("ManualPadEast", Vector3(5.85, 0.27, 12.2), Vector3(2.2, 0.22, 1.9), -14, -90, Color("#85817a"))
-	_add_rail(Vector3(-7.0, 0.64, 9.4), Vector3(-1.2, 0.64, 9.4))
-	_add_rail(Vector3(5.7, 0.6, 18.3), Vector3(11.4, 0.6, 18.3))
+	_add_rail(Vector3(-7.0, 0.62, 9.4), Vector3(-1.2, 0.62, 9.4))
+	_add_rail(Vector3(5.7, 0.58, 18.3), Vector3(11.4, 0.58, 18.3))
 
 	_add_bench(Vector3(-5.8, 0, 19.6), 180)
 	_add_bench(Vector3(9.0, 0, 20.0), 180)
@@ -277,7 +288,7 @@ func _add_npc(npc_name: String, line: String, at: Vector3, shirt: Color, accent:
 func _add_rail(start: Vector3, finish: Vector3) -> void:
 	var rail := RailScript.new()
 	add_child(rail)
-	rail.setup(start, finish)
+	rail.setup(start, finish, Color("#727b80"), collisions_enabled)
 
 
 func _add_box(
@@ -298,7 +309,7 @@ func _add_box(
 	mesh_instance.mesh = mesh
 	mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	root.add_child(mesh_instance)
-	if collision:
+	if collision and collisions_enabled:
 		var body := StaticBody3D.new()
 		var shape := CollisionShape3D.new()
 		var box := BoxShape3D.new()

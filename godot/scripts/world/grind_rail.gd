@@ -6,7 +6,7 @@ var end_point := Vector3.FORWARD
 var thickness := 0.11
 
 
-func setup(start: Vector3, finish: Vector3, rail_color := Color("#727b80")) -> void:
+func setup(start: Vector3, finish: Vector3, rail_color := Color("#727b80"), collision_enabled := true) -> void:
 	start_point = start
 	end_point = finish
 	position = (start + finish) * 0.5
@@ -22,13 +22,14 @@ func setup(start: Vector3, finish: Vector3, rail_color := Color("#727b80")) -> v
 	mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	add_child(mesh_instance)
 
-	var body := StaticBody3D.new()
-	var shape := CollisionShape3D.new()
-	var box := BoxShape3D.new()
-	box.size = Vector3(thickness, thickness, length)
-	shape.shape = box
-	body.add_child(shape)
-	add_child(body)
+	if collision_enabled:
+		var body := StaticBody3D.new()
+		var shape := CollisionShape3D.new()
+		var box := BoxShape3D.new()
+		box.size = Vector3(thickness, thickness, length)
+		shape.shape = box
+		body.add_child(shape)
+		add_child(body)
 
 	for point in [start, finish]:
 		var post := MeshInstance3D.new()
