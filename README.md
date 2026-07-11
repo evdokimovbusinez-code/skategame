@@ -8,6 +8,17 @@ collect VHS tapes and build combos through the central DIY park.
 Built with Three.js + Rapier (`@dimforge/rapier3d-compat`) + Vite/TypeScript. No backend,
 no assets — all textures and SFX are generated procedurally in code.
 
+## Godot 4.7 port
+
+The playable Godot port lives in [`godot/`](godot). Open `godot/project.godot` in
+Godot 4.7 and press **F6** or **F5**. It includes the rebuilt Burnout district, enterable
+shop and abandoned building, procedural characters, skating/walking, ollies, kickflips,
+grinds, NPC interaction and the punk-zine HUD. The original browser edition remains at
+the repository root as a reference and playable backup.
+
+Godot controls: `WASD` ride/walk, `Space` ollie, `F` kickflip in air, `Tab` skate/walk,
+`E` interact, `R` reset, `Esc` pause, mouse to look.
+
 ## Run
 
 ```
